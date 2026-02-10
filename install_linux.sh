@@ -1,20 +1,16 @@
 #!/bin/bash
-# BeamSkin Studio - Linux Installation Script
-# This script installs all dependencies for BeamSkin Studio on Linux
 
 echo "============================================================"
 echo "BeamSkin Studio - Linux Installation"
 echo "============================================================"
 echo ""
 
-# Check if running on Linux
 if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     echo "ERROR: This script is for Linux systems only!"
     echo "Current OS: $OSTYPE"
     exit 1
 fi
 
-# Detect distribution
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     DISTRO=$ID
@@ -26,7 +22,6 @@ fi
 
 echo ""
 
-# Check if Python 3 is installed
 echo "[1/5] Checking Python 3 installation..."
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version)
@@ -35,7 +30,7 @@ else
     echo "✗ Python 3 is not installed!"
     echo ""
     echo "Installing Python 3..."
-    
+
     case $DISTRO in
         ubuntu|debian|linuxmint|pop)
             echo "Using apt package manager..."
@@ -60,18 +55,17 @@ else
             exit 1
             ;;
     esac
-    
+
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to install Python 3!"
         exit 1
     fi
-    
+
     echo "✓ Python 3 installed successfully"
 fi
 
 echo ""
 
-# Check if pip is installed
 echo "[2/5] Checking pip installation..."
 if python3 -m pip --version &> /dev/null; then
     PIP_VERSION=$(python3 -m pip --version)
@@ -80,7 +74,7 @@ else
     echo "✗ pip is not installed!"
     echo ""
     echo "Installing pip..."
-    
+
     case $DISTRO in
         ubuntu|debian|linuxmint|pop)
             sudo apt install -y python3-pip
@@ -98,18 +92,17 @@ else
             python3 -m ensurepip --user
             ;;
     esac
-    
+
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to install pip!"
         exit 1
     fi
-    
+
     echo "✓ pip installed successfully"
 fi
 
 echo ""
 
-# Check and install tkinter if needed
 echo "[3/5] Checking tkinter installation..."
 if python3 -c "import tkinter" &> /dev/null 2>&1; then
     echo "✓ tkinter is installed"
@@ -117,7 +110,7 @@ else
     echo "✗ tkinter is not installed!"
     echo ""
     echo "Installing tkinter..."
-    
+
     case $DISTRO in
         ubuntu|debian|linuxmint|pop)
             sudo apt install -y python3-tk
@@ -136,19 +129,54 @@ else
             exit 1
             ;;
     esac
-    
+
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to install tkinter!"
         exit 1
     fi
-    
+
     echo "✓ tkinter installed successfully"
 fi
 
 echo ""
 
-# Upgrade pip
-echo "[4/5] Upgrading pip to latest version..."
+echo "[4/6] Checking wmctrl installation (optional)..."
+if command -v wmctrl &> /dev/null; then
+    echo "✓ wmctrl is installed"
+else
+    echo "✗ wmctrl is not installed (optional, improves window management)"
+    echo ""
+    echo "Installing wmctrl..."
+
+    case $DISTRO in
+        ubuntu|debian|linuxmint|pop)
+            sudo apt install -y wmctrl
+            ;;
+        fedora|rhel|centos)
+            sudo dnf install -y wmctrl
+            ;;
+        arch|manjaro)
+            sudo pacman -S --noconfirm wmctrl
+            ;;
+        opensuse*)
+            sudo zypper install -y wmctrl
+            ;;
+        *)
+            echo "⚠ Warning: Could not install wmctrl for your distribution"
+            echo "  This is optional and won't affect core functionality."
+            ;;
+    esac
+
+    if command -v wmctrl &> /dev/null; then
+        echo "✓ wmctrl installed successfully"
+    else
+        echo "⚠ wmctrl installation skipped (optional feature)"
+    fi
+fi
+
+echo ""
+
+echo "[5/6] Upgrading pip to latest version..."
 python3 -m pip install --user --upgrade pip
 if [ $? -eq 0 ]; then
     echo "✓ pip upgraded successfully"
@@ -158,13 +186,11 @@ fi
 
 echo ""
 
-# Install Python dependencies
-echo "[5/5] Installing Python dependencies..."
+echo "[6/6] Installing Python dependencies..."
 echo ""
 echo "This may take a few minutes..."
 echo ""
 
-# Install CustomTkinter
 echo "Installing CustomTkinter (GUI framework)..."
 python3 -m pip install --user customtkinter
 if [ $? -ne 0 ]; then
@@ -173,7 +199,6 @@ if [ $? -ne 0 ]; then
 fi
 echo "✓ CustomTkinter installed"
 
-# Install Pillow
 echo "Installing Pillow (image processing)..."
 python3 -m pip install --user Pillow
 if [ $? -ne 0 ]; then
@@ -182,7 +207,6 @@ if [ $? -ne 0 ]; then
 fi
 echo "✓ Pillow installed"
 
-# Install requests
 echo "Installing requests (HTTP library)..."
 python3 -m pip install --user requests
 if [ $? -ne 0 ]; then
@@ -193,7 +217,6 @@ echo "✓ requests installed"
 
 echo ""
 
-# Verify installations
 echo "Verifying installations..."
 echo ""
 
@@ -235,21 +258,19 @@ echo "Or:"
 echo "  python3 main.py"
 echo ""
 
-# Make launcher executable
 if [ -f "beamskin_studio.sh" ]; then
     chmod +x beamskin_studio.sh
     echo "Made launcher script executable."
     echo ""
 fi
 
-# Ask if user wants to launch now
 read -p "Would you like to launch BeamSkin Studio now? (y/n) " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo ""
     echo "Launching BeamSkin Studio..."
     sleep 1
-    
+
     if [ -f "beamskin_studio.sh" ]; then
         ./beamskin_studio.sh
     else

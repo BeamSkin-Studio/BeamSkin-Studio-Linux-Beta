@@ -1,6 +1,4 @@
 #!/bin/bash
-# BeamSkin Studio - Linux Launcher
-# This script launches BeamSkin Studio on Linux systems
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -10,7 +8,6 @@ echo "BeamSkin Studio - Linux Launcher"
 echo "========================================="
 echo ""
 
-# Check if Python 3 is installed
 if ! command -v python3 &> /dev/null; then
     echo "ERROR: Python 3 is not installed!"
     echo ""
@@ -26,7 +23,6 @@ fi
 echo "Python 3 found: $(python3 --version)"
 echo ""
 
-# Check if pip is installed
 if ! python3 -m pip --version &> /dev/null; then
     echo "ERROR: pip is not installed!"
     echo ""
@@ -42,7 +38,6 @@ fi
 echo "pip found: $(python3 -m pip --version)"
 echo ""
 
-# Check if required packages are installed
 echo "Checking dependencies..."
 
 MISSING_DEPS=()
@@ -59,17 +54,17 @@ if ! python3 -c "import requests" &> /dev/null; then
     MISSING_DEPS+=("requests")
 fi
 
-if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
+if [ ${
     echo "Missing dependencies: ${MISSING_DEPS[*]}"
     echo ""
     echo "Would you like to install them now? (y/n)"
     read -r response
-    
+
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo ""
         echo "Installing dependencies..."
         python3 -m pip install --user customtkinter Pillow requests
-        
+
         if [ $? -ne 0 ]; then
             echo ""
             echo "ERROR: Failed to install dependencies!"
@@ -79,7 +74,7 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
             read -p "Press Enter to exit..."
             exit 1
         fi
-        
+
         echo ""
         echo "Dependencies installed successfully!"
     else
@@ -96,7 +91,6 @@ fi
 echo "All dependencies satisfied!"
 echo ""
 
-# Check if tkinter is available (system package)
 if ! python3 -c "import tkinter" &> /dev/null; then
     echo "WARNING: tkinter is not installed!"
     echo ""
@@ -108,14 +102,11 @@ if ! python3 -c "import tkinter" &> /dev/null; then
     read -p "Press Enter to continue anyway (will likely fail)..."
 fi
 
-# Launch BeamSkin Studio
 echo "Launching BeamSkin Studio..."
 echo ""
 
-# Run with python3
 python3 main.py
 
-# Keep terminal open on error
 if [ $? -ne 0 ]; then
     echo ""
     echo "BeamSkin Studio exited with an error."

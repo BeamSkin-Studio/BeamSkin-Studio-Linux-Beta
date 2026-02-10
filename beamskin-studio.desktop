@@ -4,7 +4,7 @@ Type=Application
 Name=BeamSkin Studio
 GenericName=BeamNG.drive Skin Modding Tool
 Comment=Professional tool for creating BeamNG.drive vehicle skin mods
-# IMPORTANT: Update the Exec and Icon paths to match your installation location
+
 Exec=/usr/bin/python3 /path/to/BeamSkin-Studio/main.py
 Icon=/path/to/BeamSkin-Studio/gui/Icons/BeamSkin_Studio_White.png
 Terminal=false
@@ -13,11 +13,3 @@ Keywords=beamng;modding;skins;vehicles;
 StartupNotify=true
 StartupWMClass=BeamSkin Studio
 
-# Alternative Exec line using the launcher script:
-# Exec=/path/to/BeamSkin-Studio/beamskin_studio.sh
-
-# To install this desktop entry:
-# 1. Edit the Exec and Icon paths above to match your installation
-# 2. Copy this file to: ~/.local/share/applications/beamskin-studio.desktop
-# 3. Make it executable: chmod +x ~/.local/share/applications/beamskin-studio.desktop
-# 4. Update database: update-desktop-database ~/.local/share/applications/
