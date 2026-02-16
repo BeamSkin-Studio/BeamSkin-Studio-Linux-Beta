@@ -2,8 +2,8 @@
 
 ## Installation
 
-1. **Download the repository**
-- Press on the green button "Code" and select "Download ZIP"
+1. **Download BeamSkin Studio**
+- Download zip from release
 
 
 
