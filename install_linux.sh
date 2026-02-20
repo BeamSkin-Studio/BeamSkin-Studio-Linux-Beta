@@ -215,6 +215,14 @@ if [ $? -ne 0 ]; then
 fi
 echo "✓ requests installed"
 
+echo "Installing flagpy (flag emoji library)..."
+python3 -m pip install --user flagpy
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to install flagpy!"
+    exit 1
+fi
+echo "✓ flagpy installed"
+
 echo ""
 
 echo "Verifying installations..."
@@ -235,6 +243,12 @@ fi
 python3 -c "import requests; print('✓ Requests version:', requests.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: Requests verification failed!"
+    exit 1
+fi
+
+python3 -c "import flag; print('✓ flagpy is available')"
+if [ $? -ne 0 ]; then
+    echo "ERROR: flagpy verification failed!"
     exit 1
 fi
 
