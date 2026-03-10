@@ -199,13 +199,19 @@ if [ $? -ne 0 ]; then
 fi
 echo "✓ CustomTkinter installed"
 
-echo "Installing Pillow (image processing)..."
-python3 -m pip install --user Pillow
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install Pillow!"
-    exit 1
+echo "Checking Pillow (image processing)..."
+if python3 -c "import PIL" &> /dev/null 2>&1; then
+    echo "✓ Pillow already installed - upgrading if needed..."
+    python3 -m pip install --user --upgrade Pillow
+else
+    echo "✗ Pillow not found - installing..."
+    python3 -m pip install --user Pillow
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install Pillow!"
+        exit 1
+    fi
+    echo "✓ Pillow installed successfully"
 fi
-echo "✓ Pillow installed"
 
 echo "Installing requests (HTTP library)..."
 python3 -m pip install --user requests
