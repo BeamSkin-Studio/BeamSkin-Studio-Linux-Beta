@@ -22,32 +22,86 @@ fi
 
 echo ""
 
-echo "[1/5] Checking Python 3 installation..."
-if command -v python3 &> /dev/null; then
-    PYTHON_VERSION=$(python3 --version)
-    echo "✓ Python 3 is installed: $PYTHON_VERSION"
+# -----------------------------------------------------------------------
+# Python discovery
+#
+# Checks PATH first for common interpreter names/versions, then falls
+# back to scanning typical install locations on disk - pyenv, alt
+# installs, /opt/python*, snap, etc. - for systems where python3 exists
+# but isn't (fully) registered on PATH. Only if nothing is found at all
+# do we fall through to installing a fresh Python via the package manager.
+# -----------------------------------------------------------------------
+
+PYEXE=""
+
+PATH_CANDIDATES=(python3.13 python3.12 python3.11 python3.10 python3.9 python3)
+
+DISK_GLOBS=(
+    "/usr/bin/python3.*"
+    "/usr/local/bin/python3.*"
+    "/opt/python3*/bin/python3*"
+    "/opt/python*/bin/python3*"
+    "$HOME/.pyenv/versions/*/bin/python3*"
+    "$HOME/.local/bin/python3.*"
+    "/snap/bin/python3*"
+)
+
+is_valid_python() {
+    local cand="$1"
+    [ -x "$cand" ] || command -v "$cand" &> /dev/null || return 1
+    "$cand" -c "import sys; exit(0 if sys.version_info>=(3,9) else 1)" &> /dev/null
+}
+
+echo "[1/6] Checking for an existing Python 3.9+ installation..."
+
+for cand in "${PATH_CANDIDATES[@]}"; do
+    if [ -z "$PYEXE" ] && command -v "$cand" &> /dev/null && is_valid_python "$cand"; then
+        PYEXE="$cand"
+    fi
+done
+
+if [ -z "$PYEXE" ]; then
+    shopt -s nullglob
+    for pattern in "${DISK_GLOBS[@]}"; do
+        for cand in $pattern; do
+            [ -x "$cand" ] || continue
+            base="$(basename "$cand")"
+            [[ "$base" =~ ^python3(\.[0-9]+)?$ ]] || continue
+            if is_valid_python "$cand"; then
+                PYEXE="$cand"
+                break
+            fi
+        done
+        [ -n "$PYEXE" ] && break
+    done
+    shopt -u nullglob
+fi
+
+if [ -n "$PYEXE" ]; then
+    PYTHON_VERSION=$("$PYEXE" --version 2>&1)
+    echo "✓ Found Python 3: $PYTHON_VERSION ($PYEXE)"
 else
-    echo "✗ Python 3 is not installed!"
+    echo "✗ No usable Python 3 (3.9+) found on PATH or in common install locations!"
     echo ""
-    echo "Installing Python 3..."
+    echo "Installing Python 3 via package manager..."
 
     case $DISTRO in
         ubuntu|debian|linuxmint|pop)
             echo "Using apt package manager..."
             sudo apt update
-            sudo apt install -y python3 python3-pip python3-tk python3-venv
+            sudo apt install -y python3 python3-pip python3-venv
             ;;
         fedora|rhel|centos)
             echo "Using dnf/yum package manager..."
-            sudo dnf install -y python3 python3-pip python3-tkinter
+            sudo dnf install -y python3 python3-pip
             ;;
         arch|manjaro)
             echo "Using pacman package manager..."
-            sudo pacman -S --noconfirm python python-pip tk
+            sudo pacman -S --noconfirm python python-pip
             ;;
         opensuse*)
             echo "Using zypper package manager..."
-            sudo zypper install -y python3 python3-pip python3-tk
+            sudo zypper install -y python3 python3-pip
             ;;
         *)
             echo "ERROR: Unsupported distribution!"
@@ -61,14 +115,27 @@ else
         exit 1
     fi
 
-    echo "✓ Python 3 installed successfully"
+    # Re-probe now that a package-manager install should have landed on PATH
+    for cand in "${PATH_CANDIDATES[@]}"; do
+        if [ -z "$PYEXE" ] && command -v "$cand" &> /dev/null && is_valid_python "$cand"; then
+            PYEXE="$cand"
+        fi
+    done
+
+    if [ -z "$PYEXE" ]; then
+        echo "ERROR: Python 3 install appeared to succeed, but no usable interpreter was found afterward!"
+        exit 1
+    fi
+
+    PYTHON_VERSION=$("$PYEXE" --version 2>&1)
+    echo "✓ Python 3 installed successfully: $PYTHON_VERSION"
 fi
 
 echo ""
 
-echo "[2/5] Checking pip installation..."
-if python3 -m pip --version &> /dev/null; then
-    PIP_VERSION=$(python3 -m pip --version)
+echo "[2/6] Checking pip installation..."
+if "$PYEXE" -m pip --version &> /dev/null; then
+    PIP_VERSION=$("$PYEXE" -m pip --version)
     echo "✓ pip is installed: $PIP_VERSION"
 else
     echo "✗ pip is not installed!"
@@ -89,7 +156,7 @@ else
             sudo zypper install -y python3-pip
             ;;
         *)
-            python3 -m ensurepip --user
+            "$PYEXE" -m ensurepip --user
             ;;
     esac
 
@@ -103,39 +170,29 @@ fi
 
 echo ""
 
-echo "[3/5] Checking tkinter installation..."
-if python3 -c "import tkinter" &> /dev/null 2>&1; then
-    echo "✓ tkinter is installed"
+echo "[3/6] Checking libGL (required for PySide6/Qt rendering)..."
+if ldconfig -p 2>/dev/null | grep -q "libGL.so.1"; then
+    echo "✓ libGL is available"
 else
-    echo "✗ tkinter is not installed!"
-    echo ""
-    echo "Installing tkinter..."
+    echo "✗ libGL not found - installing..."
 
     case $DISTRO in
         ubuntu|debian|linuxmint|pop)
-            sudo apt install -y python3-tk
+            sudo apt install -y libgl1
             ;;
         fedora|rhel|centos)
-            sudo dnf install -y python3-tkinter
+            sudo dnf install -y mesa-libGL
             ;;
         arch|manjaro)
-            sudo pacman -S --noconfirm tk
+            sudo pacman -S --noconfirm mesa
             ;;
         opensuse*)
-            sudo zypper install -y python3-tk
+            sudo zypper install -y Mesa-libGL1
             ;;
         *)
-            echo "ERROR: Please install tkinter manually for your distribution"
-            exit 1
+            echo "⚠ Warning: Please install libGL manually for your distribution"
             ;;
     esac
-
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to install tkinter!"
-        exit 1
-    fi
-
-    echo "✓ tkinter installed successfully"
 fi
 
 echo ""
@@ -177,7 +234,7 @@ fi
 echo ""
 
 echo "[5/6] Upgrading pip to latest version..."
-python3 -m pip install --user --upgrade pip
+"$PYEXE" -m pip install --user --upgrade pip
 if [ $? -eq 0 ]; then
     echo "✓ pip upgraded successfully"
 else
@@ -186,81 +243,58 @@ fi
 
 echo ""
 
-echo "[6/6] Installing Python dependencies..."
+echo "[6/6] Installing Python dependencies from requirements.txt..."
 echo ""
 echo "This may take a few minutes..."
 echo ""
 
-echo "Installing CustomTkinter (GUI framework)..."
-python3 -m pip install --user customtkinter
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install customtkinter!"
-    exit 1
-fi
-echo "✓ CustomTkinter installed"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Checking Pillow (image processing)..."
-if python3 -c "import PIL" &> /dev/null 2>&1; then
-    echo "✓ Pillow already installed - upgrading if needed..."
-    python3 -m pip install --user --upgrade Pillow
-else
-    echo "✗ Pillow not found - installing..."
-    python3 -m pip install --user Pillow
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    "$PYEXE" -m pip install --user -r "$SCRIPT_DIR/requirements.txt"
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to install Pillow!"
+        echo ""
+        echo "ERROR: Failed to install dependencies from requirements.txt!"
         exit 1
     fi
-    echo "✓ Pillow installed successfully"
+    echo "✓ Dependencies installed from requirements.txt"
+else
+    echo "⚠ requirements.txt not found - falling back to hardcoded package list"
+    "$PYEXE" -m pip install --user "PySide6>=6.5.0" "Pillow>=10.0.0" "imageio>=2.28.0" "requests>=2.31.0"
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "ERROR: Failed to install dependencies!"
+        exit 1
+    fi
+    echo "✓ Dependencies installed"
 fi
-
-echo "Installing requests (HTTP library)..."
-python3 -m pip install --user requests
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install requests!"
-    exit 1
-fi
-echo "✓ requests installed"
-
-echo "Installing flagpy (flag emoji library)..."
-python3 -m pip install --user flagpy
-if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install flagpy!"
-    exit 1
-fi
-echo "✓ flagpy installed"
 
 echo ""
 
 echo "Verifying installations..."
 echo ""
 
-python3 -c "import customtkinter; print('✓ CustomTkinter version:', customtkinter.__version__)"
+"$PYEXE" -c "import PySide6; print('✓ PySide6 version:', PySide6.__version__)"
 if [ $? -ne 0 ]; then
-    echo "ERROR: CustomTkinter verification failed!"
+    echo "ERROR: PySide6 verification failed!"
     exit 1
 fi
 
-python3 -c "import PIL; print('✓ Pillow version:', PIL.__version__)"
+"$PYEXE" -c "import PIL; print('✓ Pillow version:', PIL.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: Pillow verification failed!"
     exit 1
 fi
 
-python3 -c "import requests; print('✓ Requests version:', requests.__version__)"
+"$PYEXE" -c "import imageio; print('✓ imageio version:', imageio.__version__)"
+if [ $? -ne 0 ]; then
+    echo "ERROR: imageio verification failed!"
+    exit 1
+fi
+
+"$PYEXE" -c "import requests; print('✓ Requests version:', requests.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: Requests verification failed!"
-    exit 1
-fi
-
-python3 -c "import flag; print('✓ flagpy is available')"
-if [ $? -ne 0 ]; then
-    echo "ERROR: flagpy verification failed!"
-    exit 1
-fi
-
-python3 -c "import tkinter; print('✓ tkinter is available')"
-if [ $? -ne 0 ]; then
-    echo "ERROR: tkinter verification failed!"
     exit 1
 fi
 
@@ -275,11 +309,11 @@ echo "To run BeamSkin Studio:"
 echo "  ./beamskin_studio.sh"
 echo ""
 echo "Or:"
-echo "  python3 main.py"
+echo "  $PYEXE main.py"
 echo ""
 
-if [ -f "beamskin_studio.sh" ]; then
-    chmod +x beamskin_studio.sh
+if [ -f "$SCRIPT_DIR/beamskin_studio.sh" ]; then
+    chmod +x "$SCRIPT_DIR/beamskin_studio.sh"
     echo "Made launcher script executable."
     echo ""
 fi
@@ -291,9 +325,9 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Launching BeamSkin Studio..."
     sleep 1
 
-    if [ -f "beamskin_studio.sh" ]; then
-        ./beamskin_studio.sh
+    if [ -f "$SCRIPT_DIR/beamskin_studio.sh" ]; then
+        "$SCRIPT_DIR/beamskin_studio.sh"
     else
-        python3 main.py
+        "$PYEXE" main.py
     fi
 fi
