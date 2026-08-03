@@ -5,6 +5,56 @@ echo "BeamSkin Studio - Linux Installation"
 echo "============================================================"
 echo ""
 
+# -----------------------------------------------------------------------
+# Detect running from inside an unextracted archive mount.
+#
+# Some file managers (Nautilus, Dolphin, file-roller) let a user browse
+# into a .zip/.tar.gz/.rar and run a script directly from a temporary
+# mount/extraction point without ever extracting it to a real folder.
+# Catch that early since every step after this will fail confusingly.
+# -----------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOWER_PATH="$(echo "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')"
+
+IS_ARCHIVE_MOUNT=0
+case "$LOWER_PATH" in
+    *.zip/*|*.rar/*|*.7z/*|*.tar.gz/*|*.tgz/*) IS_ARCHIVE_MOUNT=1 ;;
+    */gvfs/*archive*|*/.gnome-desktop-thumbnailer*|*/gio-launch*) IS_ARCHIVE_MOUNT=1 ;;
+    *"/tmp/mount"*|*"/run/user/"*"/gvfs"*) IS_ARCHIVE_MOUNT=1 ;;
+esac
+
+# Strongest signal of all: a real extracted copy of BeamSkin Studio always
+# has main.py and requirements.txt sitting right next to this script. Their
+# absence means either the archive was never extracted, or the extraction
+# was incomplete/corrupted - either way, manual extraction is the fix.
+if [ ! -f "$SCRIPT_DIR/main.py" ] || [ ! -f "$SCRIPT_DIR/requirements.txt" ]; then
+    IS_ARCHIVE_MOUNT=1
+fi
+
+if [ "$IS_ARCHIVE_MOUNT" -eq 1 ]; then
+    echo "============================================================"
+    echo "ERROR: You're running this from inside an archive!"
+    echo "============================================================"
+    echo ""
+    echo "It looks like you're running this script from inside a"
+    echo "ZIP/RAR/TAR archive without extracting it first, or the"
+    echo "extraction is incomplete (main.py / requirements.txt are"
+    echo "missing from this folder)."
+    echo ""
+    echo "Detected folder:"
+    echo "  $SCRIPT_DIR"
+    echo ""
+    echo "To fix this:"
+    echo "  1. Extract the archive to a real folder, e.g.:"
+    echo "       unzip BeamSkin-Studio-Linux-*.zip"
+    echo "     (or use your file manager's Extract Here)"
+    echo "  2. cd into the extracted folder"
+    echo "  3. Run ./install_linux.sh from there"
+    echo ""
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
 if [[ "$OSTYPE" != "linux-gnu"* ]]; then
     echo "ERROR: This script is for Linux systems only!"
     echo "Current OS: $OSTYPE"
@@ -21,6 +71,64 @@ else
 fi
 
 echo ""
+
+# -----------------------------------------------------------------------
+# manual_fallback
+#
+# Printed whenever an install step can't be verified. Mirrors the
+# "Manual Install" and "Troubleshooting" tabs on the BeamSkin Studio
+# website so users get the same guidance here as they would there.
+# -----------------------------------------------------------------------
+manual_fallback() {
+    echo ""
+    echo "============================================================"
+    echo "ERROR: Automatic installation could not be verified."
+    echo "============================================================"
+    echo ""
+    echo "Please install manually instead:"
+    echo ""
+    echo "  1. Make sure Python 3.9+ (3.12 recommended) is installed:"
+    case "$DISTRO" in
+        ubuntu|debian|linuxmint|pop)
+            echo "       sudo apt install python3 python3-pip python3-venv"
+            ;;
+        fedora|rhel|centos)
+            echo "       sudo dnf install python3 python3-pip"
+            ;;
+        arch|manjaro)
+            echo "       sudo pacman -S python python-pip"
+            ;;
+        opensuse*)
+            echo "       sudo zypper install python3 python3-pip"
+            ;;
+        *)
+            echo "       Install python3 and python3-pip using your package manager."
+            ;;
+    esac
+    echo ""
+    echo "  2. Open a terminal in this folder and run:"
+    echo "       pip install -r requirements.txt"
+    echo "     (or: python3 -m pip install --user -r requirements.txt)"
+    echo ""
+    echo "Common issues:"
+    echo "  - tkinter not found / GUI fails to open:"
+    echo "      Ubuntu/Debian:  sudo apt install python3-tk"
+    echo "      Fedora/RHEL:    sudo dnf install python3-tkinter"
+    echo "      Arch/Manjaro:   sudo pacman -S tk"
+    echo "      openSUSE:       sudo zypper install python3-tk"
+    echo "  - libGL missing (PySide6/Qt rendering):"
+    echo "      Ubuntu/Debian:  sudo apt install libgl1"
+    echo "      Fedora:         sudo dnf install mesa-libGL"
+    echo "      Arch:           sudo pacman -S mesa"
+    echo "  - permission denied running scripts:"
+    echo "      chmod +x install_linux.sh beamskin_studio.sh"
+    echo "  - nothing works: delete this folder and the downloaded ZIP,"
+    echo "    re-download a fresh copy, and try again."
+    echo ""
+    echo "Still stuck? Please report it with the error above at:"
+    echo "  https://github.com/BeamSkin-Studio/BeamSkin-Studio-Linux-Beta/issues"
+    echo ""
+}
 
 # -----------------------------------------------------------------------
 # Python discovery
@@ -105,13 +213,14 @@ else
             ;;
         *)
             echo "ERROR: Unsupported distribution!"
-            echo "Please install Python 3 manually using your package manager."
+            manual_fallback
             exit 1
             ;;
     esac
 
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to install Python 3!"
+        manual_fallback
         exit 1
     fi
 
@@ -124,6 +233,7 @@ else
 
     if [ -z "$PYEXE" ]; then
         echo "ERROR: Python 3 install appeared to succeed, but no usable interpreter was found afterward!"
+        manual_fallback
         exit 1
     fi
 
@@ -162,6 +272,7 @@ else
 
     if [ $? -ne 0 ]; then
         echo "ERROR: Failed to install pip!"
+        manual_fallback
         exit 1
     fi
 
@@ -248,13 +359,12 @@ echo ""
 echo "This may take a few minutes..."
 echo ""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
     "$PYEXE" -m pip install --user -r "$SCRIPT_DIR/requirements.txt"
     if [ $? -ne 0 ]; then
         echo ""
         echo "ERROR: Failed to install dependencies from requirements.txt!"
+        manual_fallback
         exit 1
     fi
     echo "✓ Dependencies installed from requirements.txt"
@@ -264,6 +374,7 @@ else
     if [ $? -ne 0 ]; then
         echo ""
         echo "ERROR: Failed to install dependencies!"
+        manual_fallback
         exit 1
     fi
     echo "✓ Dependencies installed"
@@ -277,24 +388,28 @@ echo ""
 "$PYEXE" -c "import PySide6; print('✓ PySide6 version:', PySide6.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: PySide6 verification failed!"
+    manual_fallback
     exit 1
 fi
 
 "$PYEXE" -c "import PIL; print('✓ Pillow version:', PIL.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: Pillow verification failed!"
+    manual_fallback
     exit 1
 fi
 
 "$PYEXE" -c "import imageio; print('✓ imageio version:', imageio.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: imageio verification failed!"
+    manual_fallback
     exit 1
 fi
 
 "$PYEXE" -c "import requests; print('✓ Requests version:', requests.__version__)"
 if [ $? -ne 0 ]; then
     echo "ERROR: Requests verification failed!"
+    manual_fallback
     exit 1
 fi
 

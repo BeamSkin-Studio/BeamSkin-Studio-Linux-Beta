@@ -9,6 +9,54 @@ echo "========================================="
 echo ""
 
 # -----------------------------------------------------------------------
+# Make sure we're not still inside an unextracted archive.
+#
+# Some file managers (Nautilus, Dolphin, file-roller) let a user browse
+# into a .zip/.tar.gz/.rar and run a script directly from a temporary
+# mount/extraction point without ever extracting it to a real folder.
+# Catch that early since every step after this will fail confusingly.
+# -----------------------------------------------------------------------
+LOWER_PATH="$(echo "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]')"
+
+IS_ARCHIVE_MOUNT=0
+case "$LOWER_PATH" in
+    *.zip/*|*.rar/*|*.7z/*|*.tar.gz/*|*.tgz/*) IS_ARCHIVE_MOUNT=1 ;;
+    */gvfs/*archive*|*/.gnome-desktop-thumbnailer*|*/gio-launch*) IS_ARCHIVE_MOUNT=1 ;;
+    *"/tmp/mount"*|*"/run/user/"*"/gvfs"*) IS_ARCHIVE_MOUNT=1 ;;
+esac
+
+# Strongest signal of all: a real extracted copy of BeamSkin Studio always
+# has main.py and requirements.txt sitting right next to this script.
+if [ ! -f "$SCRIPT_DIR/main.py" ] || [ ! -f "$SCRIPT_DIR/requirements.txt" ]; then
+    IS_ARCHIVE_MOUNT=1
+fi
+
+if [ "$IS_ARCHIVE_MOUNT" -eq 1 ]; then
+    echo "============================================================"
+    echo "ERROR: BeamSkin Studio doesn't look fully extracted!"
+    echo "============================================================"
+    echo ""
+    echo "It looks like this script is running from inside a"
+    echo "ZIP/RAR/TAR archive without extracting it first, or the"
+    echo "extraction is incomplete (main.py / requirements.txt are"
+    echo "missing from this folder)."
+    echo ""
+    echo "Detected folder:"
+    echo "  $SCRIPT_DIR"
+    echo ""
+    echo "To fix this:"
+    echo "  1. Extract the archive to a real folder, e.g.:"
+    echo "       unzip BeamSkin-Studio-Linux-*.zip"
+    echo "     (or use your file manager's Extract Here)"
+    echo "  2. cd into the extracted folder"
+    echo "  3. Run ./install_linux.sh from there first"
+    echo "  4. Then run ./beamskin_studio.sh"
+    echo ""
+    read -p "Press Enter to exit..."
+    exit 1
+fi
+
+# -----------------------------------------------------------------------
 # Python discovery
 #
 # Mirrors the Windows .bat probing chain (py -3.13 ... py -3.9, then
@@ -161,7 +209,11 @@ fi
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo "Missing dependencies: ${MISSING_DEPS[*]}"
     echo ""
-    echo "Would you like to install them now? (y/n)"
+    echo "This usually means BeamSkin Studio hasn't been fully set up yet."
+    echo "Recommended: run ./install_linux.sh instead, which handles this"
+    echo "along with Python, libGL, and other system-level requirements."
+    echo ""
+    echo "Would you like to quickly install just the missing packages now instead? (y/n)"
     read -r response
 
     if [[ "$response" =~ ^[Yy]$ ]]; then
@@ -176,7 +228,7 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
         if [ $? -ne 0 ]; then
             echo ""
             echo "ERROR: Failed to install dependencies!"
-            echo "Please try running: ./install_linux.sh"
+            echo "Please run ./install_linux.sh instead for a full setup."
             echo ""
             read -p "Press Enter to exit..."
             exit 1
